@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peugeot 207 — Simulatore launcher</title>
+<style>:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+  --base: #171715;
+  --surface: #22221e;
+  --line: #3e3b34;
+  --text: #f4efe4;
+  --muted: #bdb6a8;
+  --accent: #f0c77e;
+}
+* { box-sizing: border-box; }
+body { margin: 0; display: grid; place-items: center; min-height: 100dvh; background: #0e0e0d; color: var(--text); }
+#frame { position: relative; overflow: hidden; }
+#display { position: absolute; width: 1024px; height: 600px; transform-origin: top left; background: var(--base); padding: 0 40px; display: grid; grid-template-rows: 75px minmax(0, 1fr) 78px 34px; }
+header, footer { display: flex; align-items: center; justify-content: space-between; }
+header { border-bottom: 1px solid var(--line); }
+footer { color: var(--muted); font-size: 13px; }
+.header-actions { display: flex; align-items: center; gap: 22px; }
+#settings-link { background: transparent; }
+#settings-link[aria-current] { color: var(--accent); border-color: var(--accent); }
+.divider { padding: 0 7px; }
+#status { display: flex; align-items: center; gap: 10px; font-size: 16px; color: var(--muted); }
+#status.connected { color: var(--text); }
+#status svg { width: 19px; height: 19px; }
+svg { width: 25px; height: 25px; flex: none; }
+button { font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; cursor: pointer; min-height: 54px; }
+button:hover:not(:disabled) { background: #302e27; border-color: #817561; }
+button:focus-visible, input:focus-visible, h1:focus-visible, .clock:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+button:disabled { opacity: .48; cursor: default; }
+.brand { display: flex; align-items: center; gap: 13px; padding: 0 14px; margin-left: -14px; background: transparent; border-color: transparent; font-size: 19px; font-weight: 650; }
+.brand-mark { width: 23px; height: 15px; transform: skew(-24deg); border-left: 6px solid var(--accent); border-right: 6px solid var(--accent); }
+#screen { min-height: 0; padding: 17px 0; }
+.home { height: 100%; display: grid; grid-template-columns: 43% 57%; align-items: center; }
+.clock {
+  --minute-angle: 0deg;
+  position: relative;
+  justify-self: center;
+  width: 298px;
+  aspect-ratio: 1;
+  border: 1px solid #61594a;
+  border-radius: 50%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+}
+.clock-ticks, .minute-marker { position: absolute; pointer-events: none; border-radius: 50%; }
+.clock-ticks {
+  inset: 10px;
+  background: repeating-conic-gradient(from -.33deg, #746958 0deg .66deg, transparent .66deg 6deg);
+  mask-image: radial-gradient(closest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+}
+.minute-marker { inset: 7px; transform: rotate(var(--minute-angle)); }
+.minute-marker::before { content: ""; position: absolute; top: 0; left: calc(50% - 2px); width: 4px; height: 16px; border-radius: 2px; background: var(--accent); }
+.clock time { font-size: 78px; font-weight: 490; letter-spacing: -.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+.clock p { font-size: 17px; margin-top: 12px; color: var(--muted); }
+.clock p::first-letter { text-transform: uppercase; }
+.home-media { display: grid; justify-items: start; align-content: center; gap: 24px; min-height: 258px; padding: 0 36px; border-left: 1px solid var(--line); }
+.home-media h1 { font-size: 46px; line-height: 1.05; }
+.media-info { display: grid; gap: 7px; }
+.source { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 17px; }
+.source svg { width: 20px; height: 20px; }
+#dock { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.dock-item { position: relative; display: flex; justify-content: center; align-items: center; gap: 13px; font-size: 19px; font-weight: 650; background: transparent; border: 0; border-radius: 0; }
+.dock-item + .dock-item { border-left: 1px solid var(--line); }
+.dock-item:first-child { border-radius: 11px 0 0 11px; }
+.dock-item:last-child { border-radius: 0 11px 11px 0; }
+.dock-item[aria-current] { background: #30291e; color: var(--accent); }
+.dock-item[aria-current]::after { content: ""; position: absolute; bottom: 9px; left: calc(50% - 14px); width: 28px; height: 2px; background: var(--accent); }
+.dock-item:focus-visible { z-index: 1; outline-offset: -4px; }
+.dock-item.unavailable { color: var(--muted); }
+.dock-item.session-active::before { content: ""; position: absolute; top: 10px; right: 11px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.page-head { display: flex; align-items: center; gap: 17px; margin-bottom: 13px; }
+.back, .icon { display: inline-grid; place-items: center; width: 60px; }
+h1, h2, p { margin: 0; }
+h1 { font-size: 33px; letter-spacing: -.025em; }
+h2 { font-size: 35px; letter-spacing: -.025em; }
+.subtle { color: var(--muted); font-size: 19px; line-height: 1.5; }
+.music, .phone { display: grid; grid-template-columns: 1fr 1fr; gap: 29px; align-items: stretch; min-height: 276px; }
+.track { background: #1f1e1a; border: 1px solid #4b4539; border-radius: 12px; padding: 26px; display: flex; flex-direction: column; justify-content: space-between; }
+.track svg { width: 49px; height: 49px; color: var(--accent); }
+.player, .dial { display: flex; flex-direction: column; justify-content: center; gap: 19px; }
+.transport { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.primary { background: var(--accent); color: #2a1d0b; border-color: var(--accent); font-weight: 700; }
+.primary:hover:not(:disabled) { background: #ffdd9c; color: #2a1d0b; }
+.transport .primary { width: 94px; min-height: 66px; }
+.timeline { display: grid; gap: 5px; }
+input[type=range] { width: 100%; height: 44px; margin: 0; accent-color: var(--accent); }
+.times { display: flex; justify-content: space-between; color: var(--muted); font-variant-numeric: tabular-nums; }
+.number { font-size: 49px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dial-actions { display: grid; grid-template-columns: 1fr 60px; gap: 10px; }
+.keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.keypad button { font-size: 24px; min-height: 59px; font-variant-numeric: tabular-nums; }
+.settings { display: grid; gap: 13px; }
+.setting { border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.setting strong { display: block; font-size: 22px; }
+.setting button, .action { padding: 0 20px; }
+.auto { min-height: 270px; border: 1px solid var(--line); border-radius: 12px; padding: 32px; display: grid; justify-items: start; align-content: center; gap: 16px; }
+.auto svg { width: 45px; height: 45px; color: var(--accent); }
+::selection { background: var(--accent); color: #2a1d0b; }
+
+.end-call { color: #ffece7; background: #723a31; border-color: #a65d51; font-weight: 700; }
+.end-call:hover:not(:disabled) { background: #874539; border-color: #c2796c; }
+</style>
+
+
+</head>
+<body>
+<main id="frame" aria-label="Simulatore autoradio Peugeot 207">
+  <div id="display">
+    <header>
+      <button id="home" class="brand" data-go="home" aria-label="Torna alla Home"><span class="brand-mark" aria-hidden="true"></span> Peugeot 207</button>
+      <div class="header-actions">
+        <span id="status" role="status"></span>
+        <button class="icon" id="settings-link" data-go="settings" aria-label="Impostazioni"></button>
+      </div>
+    </header>
+    <section id="screen" aria-label="Schermata del launcher"></section>
+    <nav id="dock" aria-label="Funzioni del launcher"></nav>
+    <footer><span>Simulatore <span class="divider">/</span> 1024 × 600</span><span id="mode"></span></footer>
+  </div>
+</main>
+<script>"use strict";
+
+// Contratto della demo. La UI legge lo stato e invia comandi a questo adattatore.
+const demo = (() => {
+  const tracks = [
+    { title: "Midnight Drive", artist: "Northline", duration: 228 },
+    { title: "Luci di città", artist: "Via Notturna", duration: 196 },
+    { title: "Blue Hour", artist: "Marea", duration: 243 },
+  ];
+  const state = { enabled: true, connected: true, index: 0, playing: false, elapsed: 0, call: "", projection: false };
+  return {
+    read() {
+      return { ...state, track: tracks[state.index] };
+    },
+    toggleDemo() {
+      state.enabled = !state.enabled;
+      state.index = 0;
+      state.elapsed = 0;
+      this.setConnected(state.enabled);
+    },
+    setConnected(connected) {
+      state.connected = state.enabled && connected;
+      if (!state.connected) {
+        state.playing = false;
+        state.call = "";
+        state.projection = false;
+      }
+    },
+    togglePlayback() {
+      if (state.connected) state.playing = !state.playing;
+    },
+    skip(step) {
+      if (!state.connected) return;
+      state.index = (state.index + step + tracks.length) % tracks.length;
+      state.elapsed = 0;
+    },
+    seek(seconds) {
+      if (!state.connected || !Number.isFinite(seconds)) return;
+      state.elapsed = Math.max(0, Math.min(seconds, tracks[state.index].duration));
+    },
+    tick(seconds) {
+      if (!state.playing) return;
+      state.elapsed += seconds;
+      if (state.elapsed >= tracks[state.index].duration) this.skip(1);
+    },
+    dial(number) {
+      if (state.connected && /^[0-9*#]{1,20}$/.test(number)) state.call = number;
+    },
+    hangUp() {
+      state.call = "";
+    },
+    toggleProjection() {
+      if (state.connected) state.projection = !state.projection;
+    },
+  };
+})();
+
+"use strict";
+
+const paths = {
+  home: '<path d="m3 11 9-8 9 8v9h-6v-6H9v6H3z"/>',
+  auto: '<path d="m4 19 7-15 9 15-8-4z"/>',
+  music: '<path d="M9 18V5l11-2v13M9 18a3 2 0 1 1-6 0 3 2 0 0 1 6 0Zm11-2a3 2 0 1 1-6 0 3 2 0 0 1 6 0Z"/>',
+  phone: '<path d="m7 3 3 5-2 2a14 14 0 0 0 6 6l2-2 5 3-1 4C11 22 2 13 3 4z"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="m10 2-.6 3.2L7 6.6 4 5.5 2 9l2.5 2v2L2 15l2 3.5 3-1.1 2.4 1.4L10 22h4l.6-3.2 2.4-1.4 3 1.1 2-3.5-2.5-2v-2L22 9l-2-3.5-3 1.1-2.4-1.4L14 2z"/>',
+  bluetooth: '<path d="m6 6 12 12-6 4V2l6 4L6 18"/>',
+  back: '<path d="m11 5-7 7 7 7M4 12h16"/>',
+  previous: '<path d="M5 5v14m14-14L8 12l11 7z"/>',
+  next: '<path d="M19 5v14M5 5l11 7-11 7z"/>',
+  play: '<path fill="currentColor" d="m8 5 12 7-12 7z"/>',
+  pause: '<path d="M9 5v14m6-14v14"/>',
+  erase: '<path d="M8 5h13v14H8l-6-7zM11 9l6 6m0-6-6 6"/>',
+};
+const icon = (name) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
+const screen = document.querySelector("#screen");
+const titles = { music: "Musica Bluetooth", phone: "Telefono", settings: "Impostazioni", auto: "Android Auto" };
+const disabled = (condition) => condition ? "disabled" : "";
+let page = "home";
+let number = "";
+
+function fitDisplay() {
+  const scale = Math.min(1, innerWidth / 1024, innerHeight / 600);
+  const frame = document.querySelector("#frame");
+  frame.style.width = `${1024 * scale}px`;
+  frame.style.height = `${600 * scale}px`;
+  document.querySelector("#display").style.transform = `scale(${scale})`;
+}
+
+function updateClock() {
+  const clock = document.querySelector("#clock");
+  if (!clock) return;
+  const now = new Date();
+  const time = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  if (clock.textContent === time) return;
+  clock.textContent = time;
+  document.querySelector(".clock").style.setProperty("--minute-angle", `${now.getMinutes() * 6}deg`);
+  clock.dateTime = now.toISOString();
+  document.querySelector("#date").textContent = now.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+}
+
+const dockItems = [
+  ["home", "Home", "home"],
+  ["auto", "Android Auto", "auto"],
+  ["music", "Musica", "music"],
+  ["phone", "Telefono", "phone"],
+];
+
+document.querySelector("#dock").innerHTML = dockItems.map(([target, label, symbol]) =>
+  `<button class="dock-item" data-go="${target}">${icon(symbol)}<span>${label}</span></button>`
+).join("");
+document.querySelector("#settings-link").innerHTML = icon("settings");
+
+function transport(state) {
+  return `<div class="transport">
+    ${control("prev", "Brano precedente", "previous", !state.connected)}
+    ${control("play", state.playing ? "Pausa" : "Riproduci", state.playing ? "pause" : "play", !state.connected, true)}
+    ${control("next", "Brano successivo", "next", !state.connected)}
+  </div>`;
+}
+
+function home(state) {
+  return `<div class="home">
+    <div class="clock" tabindex="-1" role="group" aria-label="Ora e data">
+      <span class="clock-ticks" aria-hidden="true"></span>
+      <span class="minute-marker" aria-hidden="true"></span>
+      <time id="clock"></time><p id="date"></p>
+    </div>
+    <div class="home-media">
+      <p class="source">${icon("music")} Musica Bluetooth</p>
+      <div class="media-info">
+        <h1>${state.connected ? state.track.title : "Sorgente scollegata"}</h1>
+        <p class="subtle">${state.connected ? state.track.artist : "Connetti il telefono per riprodurre musica."}</p>
+      </div>
+      ${state.connected ? transport(state) : '<button class="action" data-go="settings">Apri impostazioni</button>'}
+    </div>
+  </div>`;
+}
+
+const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
+const control = (action, label, symbol, locked, primary = false) =>
+  `<button class="icon${primary ? " primary" : ""}" data-action="${action}" aria-label="${label}" ${disabled(locked)}>${icon(symbol)}</button>`;
+
+function music(state) {
+  const { track, connected } = state;
+  return `<div class="music">
+    <div class="track">${icon("music")}<div>
+      <h2>${connected ? track.title : "Nessun brano"}</h2>
+      <p class="subtle">${connected ? track.artist : "Sorgente Bluetooth non disponibile"}</p>
+    </div></div>
+    <div class="player">
+      <div class="timeline">
+        <input id="seek" type="range" min="0" max="${connected ? track.duration : 1}" value="${connected ? state.elapsed : 0}" aria-label="Posizione nel brano" ${disabled(!connected)}>
+        <div class="times"><span id="elapsed"></span><span>${formatTime(connected ? track.duration : 0)}</span></div>
+      </div>
+      ${transport(state)}
+    </div>
+  </div>`;
+}
+
+function phone(state) {
+  const locked = !state.connected || Boolean(state.call);
+  return `<div class="phone">
+    <div class="dial">
+      <div>
+        <p id="call-status" class="subtle" role="status">${state.call ? "Chiamata simulata in corso" : state.connected ? "Tastierino numerico" : "Telefono non disponibile"}</p>
+        <p class="number" aria-live="polite">${state.call || number || "—"}</p>
+      </div>
+      <div class="dial-actions">
+        <button class="${state.call ? "end-call" : "primary"}" data-action="call" ${disabled(!state.connected || (!number && !state.call))}>${state.call ? "Termina chiamata" : "Simula chiamata"}</button>
+        ${control("erase", "Cancella ultima cifra", "erase", locked || !number)}
+      </div>
+    </div>
+    <div class="keypad" role="group" aria-label="Tastierino">
+      ${[..."123456789*0#"].map((digit) => `<button data-action="digit" data-digit="${digit}" ${disabled(locked || number.length >= 20)}>${digit}</button>`).join("")}
+    </div>
+  </div>`;
+}
+
+function settings(state) {
+  return `<div class="settings">
+    <div class="setting"><div><strong>Modalità demo</strong><p class="subtle">Brani, chiamate e connessione simulati</p></div>
+      <button data-action="demo" aria-pressed="${state.enabled}">${state.enabled ? "Disattiva demo" : "Attiva demo"}</button>
+    </div>
+    <div class="setting"><div><strong>Bluetooth</strong><p class="subtle">${state.connected ? "Telefono demo connesso" : "Nessun telefono connesso"}</p></div>
+      <button data-action="connect" ${disabled(!state.enabled)}>${state.connected ? "Disconnetti" : "Connetti telefono demo"}</button>
+    </div>
+  </div>`;
+}
+
+function projection(state) {
+  return `<div class="auto">${icon("auto")}
+    <h2>${state.projection ? "Sessione demo attiva" : "Proiezione Android Auto"}</h2>
+    <p class="subtle">${state.connected ? "Anteprima dello stato di connessione alla proiezione." : "Connetti il telefono demo dalle impostazioni."}</p>
+    <button class="action primary" ${state.connected ? 'data-action="projection"' : 'data-go="settings"'}>${state.projection ? "Chiudi demo" : state.connected ? "Avvia demo" : "Apri impostazioni"}</button>
+  </div>`;
+}
+
+const pages = { home, music, phone, settings, auto: projection };
+
+function updateTimeline(state) {
+  const seek = document.querySelector("#seek");
+  if (!seek) return;
+  const elapsed = state.connected ? Math.floor(state.elapsed) : 0;
+  seek.value = elapsed;
+  seek.setAttribute("aria-valuetext", formatTime(elapsed));
+  document.querySelector("#elapsed").textContent = formatTime(elapsed);
+}
+
+function render({ navigate = false, restore = false } = {}) {
+  const active = document.activeElement;
+  const state = demo.read();
+  for (const button of document.querySelectorAll("#dock button, #settings-link")) {
+    if (button.dataset.go === page) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  }
+  const auto = document.querySelector('#dock [data-go="auto"]');
+  auto.classList.toggle("session-active", state.projection);
+  auto.classList.toggle("unavailable", !state.connected);
+  auto.setAttribute("aria-label", state.projection ? "Android Auto, sessione demo attiva" :
+    state.connected ? "Android Auto" : "Android Auto, proiezione non disponibile");
+  const status = document.querySelector("#status");
+  status.classList.toggle("connected", state.connected);
+  const connection = state.connected ? "Bluetooth demo connesso" : "Bluetooth disconnesso";
+  if (status.textContent !== connection) status.innerHTML = icon("bluetooth") + connection;
+  document.querySelector("#mode").textContent = state.enabled ? "Demo attiva" : "Demo disattivata";
+  const heading = page === "home" ? "" : `<div class="page-head">
+    <button class="back" data-go="home" aria-label="Torna alla Home">${icon("back")}</button>
+    <h1 tabindex="-1">${titles[page]}</h1>
+  </div>`;
+  screen.innerHTML = heading + pages[page](state);
+  updateClock();
+  updateTimeline(state);
+  if (navigate) {
+    (page === "home" ? screen.querySelector(".clock") : screen.querySelector("h1")).focus();
+  } else if (restore && active?.dataset.action) {
+    const replacement = [...screen.querySelectorAll("[data-action]")].find((button) =>
+      button.dataset.action === active.dataset.action && button.dataset.digit === active.dataset.digit);
+    (replacement?.disabled ? screen.querySelector("h1") : replacement)?.focus();
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button || button.disabled) return;
+  const { go, action, digit } = button.dataset;
+  if (go) {
+    page = go;
+    render({ navigate: true });
+    return;
+  }
+  const state = demo.read();
+  switch (action) {
+    case "prev": demo.skip(-1); break;
+    case "next": demo.skip(1); break;
+    case "play": demo.togglePlayback(); break;
+    case "demo": demo.toggleDemo(); number = ""; break;
+    case "connect": demo.setConnected(!state.connected); break;
+    case "projection": demo.toggleProjection(); break;
+    case "digit": number += digit; break;
+    case "erase": number = number.slice(0, -1); break;
+    case "call":
+      if (state.call) demo.hangUp();
+      else demo.dial(number);
+      break;
+    default: return;
+  }
+  render({ restore: true });
+});
+
+screen.addEventListener("input", (event) => {
+  if (event.target.id !== "seek") return;
+  demo.seek(event.target.valueAsNumber);
+  updateTimeline(demo.read());
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || page === "home") return;
+  page = "home";
+  render({ navigate: true });
+});
+
+let lastTick = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  const before = demo.read();
+  demo.tick((now - lastTick) / 1000);
+  lastTick = now;
+  const after = demo.read();
+  if (before.index !== after.index && (page === "music" || page === "home")) render({ restore: true });
+  else if (page === "music") updateTimeline(after);
+  else if (page === "home") updateClock();
+}, 250);
+
+window.addEventListener("resize", fitDisplay);
+fitDisplay();
+render();
+
+window.addEventListener("DOMContentLoaded", async () => {
+  const result = document.createElement("p");
+  Object.assign(result.style, { position: "fixed", inset: "0 auto auto 0", margin: "0", background: "#111", padding: "5px", zIndex: "20" });
+  document.body.append(result);
+  const query = (selector) => document.querySelector(selector);
+  const assert = (ok, label) => { if (!ok) throw new Error(label); };
+  const click = (selector) => query(selector).click();
+  const action = (name) => click(`[data-action="${name}"]`);
+  const go = (name) => click(`[data-go="${name}"]`);
+  const has = (selector, text) => query(selector).textContent.includes(text);
+  const bounds = () => {
+    const display = query("#display").getBoundingClientRect();
+    const footer = query("#dock").getBoundingClientRect();
+    for (const item of document.querySelectorAll("#screen button, #screen h1, #screen h2, #screen input")) {
+      const box = item.getBoundingClientRect();
+      assert(box.width > 0 && box.left >= display.left && box.right <= display.right && box.bottom <= footer.top, "Elemento tagliato " + item.textContent);
+    }
+  };
+  try {
+    assert(query("#display").offsetWidth === 1024 && query("#display").offsetHeight === 600, "Risoluzione");
+    assert(Math.abs(query("#frame").getBoundingClientRect().width / query("#frame").getBoundingClientRect().height - 1024 / 600) < .001, "Proporzioni");
+    assert(/^\d\d:\d\d$/.test(query("#clock").textContent) && query("#date").textContent.length > 5, "Data e orologio");
+    bounds();
+    assert(query('#dock [aria-current="page"]').dataset.go === "home", "Home selezionata");
+    action("next");
+    assert(has(".home-media h1", "Luci di città"), "Cambio brano dalla Home");
+    action("prev");
+    action("play");
+    assert(query('[data-action="play"]').getAttribute("aria-label") === "Pausa", "Play dalla Home");
+    action("play");
+    go("music"); bounds();
+    assert(document.activeElement === query("h1"), "Focus di navigazione");
+    action("play");
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+    assert(query("#seek").valueAsNumber >= 1, "Avanzamento");
+    action("play");
+    const seek = query("#seek");
+    seek.value = "85";
+    seek.dispatchEvent(new Event("input", { bubbles: true }));
+    assert(has("#elapsed", "1:25"), "Seek");
+    action("next");
+    assert(has("h2", "Luci di città") && has("#elapsed", "0:00"), "Successivo");
+    action("prev");
+    assert(has("h2", "Midnight Drive"), "Precedente");
+    action("prev");
+    assert(has("h2", "Blue Hour"), "Playlist ciclica");
+    go("home"); go("phone"); bounds();
+    click('[data-digit="1"]'); click('[data-digit="2"]'); click('[data-digit="#"]');
+    action("erase");
+    assert(has(".number", "12"), "Composizione");
+    action("call");
+    assert(has("#call-status", "in corso") && query('[data-digit="1"]').disabled, "Chiamata");
+    action("call");
+    assert(has("#call-status", "Tastierino"), "Chiusura chiamata");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    assert(query("#clock"), "Esc");
+    go("auto"); bounds();
+    action("projection");
+    assert(has("h2", "Sessione demo attiva"), "Proiezione");
+    action("projection");
+    assert(has("h2", "Proiezione Android Auto"), "Chiusura proiezione");
+    go("home"); go("settings"); bounds();
+    action("connect");
+    assert(has("#status", "disconnesso"), "Disconnessione");
+    go("home");
+    assert(has(".home-media h1", "Sorgente scollegata") && !query('[data-action="play"]'), "Home senza sorgente");
+    go("music"); bounds();
+    assert(query("#seek").disabled && query('[data-action="play"]').disabled, "Musica indisponibile");
+    go("home"); go("phone"); bounds();
+    assert(query('[data-action="call"]').disabled && query('[data-digit="1"]').disabled, "Telefono indisponibile");
+    go("home"); go("auto"); bounds();
+    click('.auto [data-go="settings"]');
+    action("connect");
+    assert(has("#status", "connesso") && demo.read().connected, "Riconnessione");
+    action("demo");
+    assert(query('[data-action="connect"]').disabled && has("#mode", "disattivata"), "Demo spenta");
+    action("demo");
+    assert(demo.read().connected && has("#mode", "Demo attiva"), "Demo riattivata");
+    go("home");
+    result.textContent = "PASS — geometria, Home, Musica, Telefono, Android Auto, Impostazioni e fallback";
+  } catch (error) {
+    result.textContent = "FAIL — " + error.message;
+  }
+});
+</script></body>
+</html>

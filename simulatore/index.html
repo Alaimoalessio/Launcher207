@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peugeot 207 — Simulatore launcher</title>
+<link rel="stylesheet" href="style.css">
+<script src="demo.js" defer></script>
+<script src="app.js" defer></script>
+</head>
+<body>
+<main id="frame" aria-label="Simulatore autoradio Peugeot 207">
+  <div id="display">
+    <header>
+      <button id="home" class="brand" data-go="home" aria-label="Torna alla Home"><span class="brand-mark" aria-hidden="true"></span> Peugeot 207</button>
+      <div class="header-actions">
+        <span id="status" role="status"></span>
+        <button class="icon" id="settings-link" data-go="settings" aria-label="Impostazioni"></button>
+      </div>
+    </header>
+    <section id="screen" aria-label="Schermata del launcher"></section>
+    <nav id="dock" aria-label="Funzioni del launcher"></nav>
+    <footer><span>Simulatore <span class="divider">/</span> 1024 × 600</span><span id="mode"></span></footer>
+  </div>
+</main>
+</body>
+</html>

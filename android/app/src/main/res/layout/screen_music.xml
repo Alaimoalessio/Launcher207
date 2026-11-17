@@ -1,0 +1,16 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:baselineAligned="false">
+    <LinearLayout android:layout_width="440dp" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical" android:background="@drawable/panel" android:padding="28dp">
+        <TextView android:id="@+id/music_title" style="@style/Title" android:text="@string/music_title" />
+        <TextView android:id="@+id/music_artist" style="@style/Muted" android:text="@string/music_artist" android:layout_marginTop="10dp" />
+    </LinearLayout>
+    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center" android:paddingStart="24dp">
+        <SeekBar android:id="@+id/seek" android:layout_width="match_parent" android:layout_height="56dp" android:contentDescription="@string/seek" />
+        <TextView android:id="@+id/track_time" style="@style/Muted" android:text="@string/track_time" android:layout_marginBottom="16dp" />
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false">
+            <ImageButton android:id="@+id/music_prev" style="@style/IconButton" android:src="@drawable/ic_prev" android:contentDescription="@string/music_prev" />
+            <ImageButton android:id="@+id/music_play" style="@style/IconButton" android:src="@drawable/ic_play" android:contentDescription="@string/music_play" android:background="@drawable/primary" android:tint="@color/ink" android:layout_width="94dp" />
+            <ImageButton android:id="@+id/music_next" style="@style/IconButton" android:src="@drawable/ic_next" android:contentDescription="@string/music_next" />
+        </LinearLayout>
+        <Button android:id="@+id/music_fallback" style="@style/Button" android:text="@string/music_fallback" android:visibility="gone" />
+    </LinearLayout>
+</LinearLayout>

@@ -1,0 +1,5 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@drawable/panel" android:padding="30dp" android:gravity="center_vertical" android:orientation="vertical">
+    <TextView android:id="@+id/auto_title" style="@style/Title" android:text="@string/auto_title" />
+    <TextView android:id="@+id/auto_status" style="@style/Muted" android:text="@string/auto_status" android:layout_marginTop="16dp" android:layout_marginBottom="24dp" />
+    <Button android:id="@+id/auto_open" style="@style/Primary" android:text="@string/auto_open" />
+</LinearLayout>

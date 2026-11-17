@@ -1,0 +1,84 @@
+window.addEventListener("DOMContentLoaded", async () => {
+  const result = document.createElement("p");
+  Object.assign(result.style, { position: "fixed", inset: "0 auto auto 0", margin: "0", background: "#111", padding: "5px", zIndex: "20" });
+  document.body.append(result);
+  const query = (selector) => document.querySelector(selector);
+  const assert = (ok, label) => { if (!ok) throw new Error(label); };
+  const click = (selector) => query(selector).click();
+  const action = (name) => click(`[data-action="${name}"]`);
+  const go = (name) => click(`[data-go="${name}"]`);
+  const has = (selector, text) => query(selector).textContent.includes(text);
+  const bounds = () => {
+    const display = query("#display").getBoundingClientRect();
+    const footer = query("#dock").getBoundingClientRect();
+    for (const item of document.querySelectorAll("#screen button, #screen h1, #screen h2, #screen input")) {
+      const box = item.getBoundingClientRect();
+      assert(box.width > 0 && box.left >= display.left && box.right <= display.right && box.bottom <= footer.top, "Elemento tagliato " + item.textContent);
+    }
+  };
+  try {
+    assert(query("#display").offsetWidth === 1024 && query("#display").offsetHeight === 600, "Risoluzione");
+    assert(Math.abs(query("#frame").getBoundingClientRect().width / query("#frame").getBoundingClientRect().height - 1024 / 600) < .001, "Proporzioni");
+    assert(/^\d\d:\d\d$/.test(query("#clock").textContent) && query("#date").textContent.length > 5, "Data e orologio");
+    bounds();
+    assert(query('#dock [aria-current="page"]').dataset.go === "home", "Home selezionata");
+    action("next");
+    assert(has(".home-media h1", "Luci di città"), "Cambio brano dalla Home");
+    action("prev");
+    action("play");
+    assert(query('[data-action="play"]').getAttribute("aria-label") === "Pausa", "Play dalla Home");
+    action("play");
+    go("music"); bounds();
+    assert(document.activeElement === query("h1"), "Focus di navigazione");
+    action("play");
+    await new Promise((resolve) => setTimeout(resolve, 1400));
+    assert(query("#seek").valueAsNumber >= 1, "Avanzamento");
+    action("play");
+    const seek = query("#seek");
+    seek.value = "85";
+    seek.dispatchEvent(new Event("input", { bubbles: true }));
+    assert(has("#elapsed", "1:25"), "Seek");
+    action("next");
+    assert(has("h2", "Luci di città") && has("#elapsed", "0:00"), "Successivo");
+    action("prev");
+    assert(has("h2", "Midnight Drive"), "Precedente");
+    action("prev");
+    assert(has("h2", "Blue Hour"), "Playlist ciclica");
+    go("home"); go("phone"); bounds();
+    click('[data-digit="1"]'); click('[data-digit="2"]'); click('[data-digit="#"]');
+    action("erase");
+    assert(has(".number", "12"), "Composizione");
+    action("call");
+    assert(has("#call-status", "in corso") && query('[data-digit="1"]').disabled, "Chiamata");
+    action("call");
+    assert(has("#call-status", "Tastierino"), "Chiusura chiamata");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    assert(query("#clock"), "Esc");
+    go("auto"); bounds();
+    action("projection");
+    assert(has("h2", "Sessione demo attiva"), "Proiezione");
+    action("projection");
+    assert(has("h2", "Proiezione Android Auto"), "Chiusura proiezione");
+    go("home"); go("settings"); bounds();
+    action("connect");
+    assert(has("#status", "disconnesso"), "Disconnessione");
+    go("home");
+    assert(has(".home-media h1", "Sorgente scollegata") && !query('[data-action="play"]'), "Home senza sorgente");
+    go("music"); bounds();
+    assert(query("#seek").disabled && query('[data-action="play"]').disabled, "Musica indisponibile");
+    go("home"); go("phone"); bounds();
+    assert(query('[data-action="call"]').disabled && query('[data-digit="1"]').disabled, "Telefono indisponibile");
+    go("home"); go("auto"); bounds();
+    click('.auto [data-go="settings"]');
+    action("connect");
+    assert(has("#status", "connesso") && demo.read().connected, "Riconnessione");
+    action("demo");
+    assert(query('[data-action="connect"]').disabled && has("#mode", "disattivata"), "Demo spenta");
+    action("demo");
+    assert(demo.read().connected && has("#mode", "Demo attiva"), "Demo riattivata");
+    go("home");
+    result.textContent = "PASS — geometria, Home, Musica, Telefono, Android Auto, Impostazioni e fallback";
+  } catch (error) {
+    result.textContent = "FAIL — " + error.message;
+  }
+});
