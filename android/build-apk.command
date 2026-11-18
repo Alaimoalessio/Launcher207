@@ -8,6 +8,10 @@ if [[ -z "${JAVA_HOME:-}" ]]; then
     export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
   fi
 fi
-./gradlew assembleDebug lintDebug
+./gradlew assembleDebug lintDebug testDebugUnitTest
 mkdir -p ../apk
-cp app/build/outputs/apk/debug/app-debug.apk ../apk/PeugeotLauncher-0.1.0-demo.apk
+cp app/build/outputs/apk/debug/app-debug.apk ../apk/PeugeotLauncher-0.1.1-demo.apk
+(
+  cd ../apk
+  shasum -a 256 PeugeotLauncher-0.1.1-demo.apk > PeugeotLauncher-0.1.1-demo.apk.sha256
+)

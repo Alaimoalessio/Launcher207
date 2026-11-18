@@ -17,6 +17,8 @@ class AppLinks(private val activity: Activity, private val preferences: SharedPr
                 .loadLabel(activity.packageManager).toString()
         } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
             "App non più disponibile"
+        } catch (_: SecurityException) {
+            "App non accessibile"
         }
     }
 
@@ -30,8 +32,16 @@ class AppLinks(private val activity: Activity, private val preferences: SharedPr
             return
         }
         try {
+            val info = activity.packageManager.getActivityInfo(component, 0)
+            if (!info.exported || !info.enabled || !info.applicationInfo.enabled ||
+                info.packageName == activity.packageName) {
+                Toast.makeText(activity, "Collegamento non disponibile. Scegli un’altra app.", Toast.LENGTH_LONG).show()
+                return
+            }
             activity.startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
                 .setComponent(component))
+        } catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+            Toast.makeText(activity, "App assente. Scegli un nuovo collegamento.", Toast.LENGTH_LONG).show()
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(activity, "App assente. Scegli un nuovo collegamento.", Toast.LENGTH_LONG).show()
         } catch (_: SecurityException) {
@@ -42,7 +52,8 @@ class AppLinks(private val activity: Activity, private val preferences: SharedPr
     fun choose(key: String, onChanged: () -> Unit) {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val apps = activity.packageManager.queryIntentActivities(intent, 0)
-            .filter { it.activityInfo.packageName != activity.packageName && it.activityInfo.exported }
+            .filter { it.activityInfo.packageName != activity.packageName && it.activityInfo.exported &&
+                it.activityInfo.enabled && it.activityInfo.applicationInfo.enabled }
             .distinctBy { ComponentName(it.activityInfo.packageName, it.activityInfo.name) }
             .sortedBy { it.loadLabel(activity.packageManager).toString().lowercase() }
         val labels = arrayOf("Rimuovi collegamento") + apps.map {

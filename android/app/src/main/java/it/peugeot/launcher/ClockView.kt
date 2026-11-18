@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -23,6 +24,10 @@ class ClockView(context: Context, attrs: AttributeSet?) : View(context, attrs) {
     private var lastDescription = ""
 
     fun refresh() {
+        val zone = TimeZone.getDefault()
+        timeFormat.timeZone = zone
+        dateFormat.timeZone = zone
+        calendar.timeZone = zone
         now = Date()
         val description = timeFormat.format(now) + ", " + dateFormat.format(now)
         if (description != lastDescription) {

@@ -64,6 +64,8 @@ class DemoBackend : CarBackend {
         if (elapsed >= tracks[index].duration) skip(1)
     }
     fun restore(index: Int, connected: Boolean, playing: Boolean, elapsed: Int, number: String, projection: Boolean) {
+        callNumber = ""
+        this.projection = false
         this.index = index.coerceIn(tracks.indices)
         connectDemo(connected)
         this.playing = connected && playing

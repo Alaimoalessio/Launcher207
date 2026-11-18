@@ -15,6 +15,8 @@ const paths = {
   erase: '<path d="M8 5h13v14H8l-6-7zM11 9l6 6m0-6-6 6"/>',
 };
 const icon = (name) => `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 const screen = document.querySelector("#screen");
 const titles = { music: "Musica Bluetooth", phone: "Telefono", settings: "Impostazioni", auto: "Android Auto" };
 const disabled = (condition) => condition ? "disabled" : "";
@@ -71,8 +73,8 @@ function home(state) {
     <div class="home-media">
       <p class="source">${icon("music")} Musica Bluetooth</p>
       <div class="media-info">
-        <h1>${state.connected ? state.track.title : "Sorgente scollegata"}</h1>
-        <p class="subtle">${state.connected ? state.track.artist : "Connetti il telefono per riprodurre musica."}</p>
+        <h1>${state.connected ? escapeHtml(state.track.title) : "Sorgente scollegata"}</h1>
+        <p class="subtle">${state.connected ? escapeHtml(state.track.artist) : "Connetti il telefono per riprodurre musica."}</p>
       </div>
       ${state.connected ? transport(state) : '<button class="action" data-go="settings">Apri impostazioni</button>'}
     </div>
@@ -87,8 +89,8 @@ function music(state) {
   const { track, connected } = state;
   return `<div class="music">
     <div class="track">${icon("music")}<div>
-      <h2>${connected ? track.title : "Nessun brano"}</h2>
-      <p class="subtle">${connected ? track.artist : "Sorgente Bluetooth non disponibile"}</p>
+      <h2>${connected ? escapeHtml(track.title) : "Nessun brano"}</h2>
+      <p class="subtle">${connected ? escapeHtml(track.artist) : "Sorgente Bluetooth non disponibile"}</p>
     </div></div>
     <div class="player">
       <div class="timeline">
@@ -106,7 +108,7 @@ function phone(state) {
     <div class="dial">
       <div>
         <p id="call-status" class="subtle" role="status">${state.call ? "Chiamata simulata in corso" : state.connected ? "Tastierino numerico" : "Telefono non disponibile"}</p>
-        <p class="number" aria-live="polite">${state.call || number || "—"}</p>
+        <p class="number" aria-live="polite">${escapeHtml(state.call || number || "—")}</p>
       </div>
       <div class="dial-actions">
         <button class="${state.call ? "end-call" : "primary"}" data-action="call" ${disabled(!state.connected || (!number && !state.call))}>${state.call ? "Termina chiamata" : "Simula chiamata"}</button>
@@ -187,6 +189,7 @@ document.addEventListener("click", (event) => {
   if (!button || button.disabled) return;
   const { go, action, digit } = button.dataset;
   if (go) {
+    if (!Object.hasOwn(pages, go)) return;
     page = go;
     render({ navigate: true });
     return;

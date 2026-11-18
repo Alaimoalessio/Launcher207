@@ -77,6 +77,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     action("demo");
     assert(demo.read().connected && has("#mode", "Demo attiva"), "Demo riattivata");
     go("home");
+    const originalTitle = demo.read().track.title;
+    demo.read().track.title = '<img src=x onerror="window.injected=true">';
+    render();
+    assert(!query(".home-media img") && !window.injected, "Metadati trattati come testo");
+    demo.read().track.title = originalTitle;
+    render();
     result.textContent = "PASS — geometria, Home, Musica, Telefono, Android Auto, Impostazioni e fallback";
   } catch (error) {
     result.textContent = "FAIL — " + error.message;

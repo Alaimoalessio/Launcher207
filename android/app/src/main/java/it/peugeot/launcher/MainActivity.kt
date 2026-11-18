@@ -53,12 +53,17 @@ class MainActivity : Activity() {
             demo.restore(it.getInt("index"), it.getBoolean("connected", true), it.getBoolean("playing"),
                 it.getInt("elapsed"), it.getString("call", ""), it.getBoolean("projection"))
         }
+        if (Build.VERSION.SDK_INT >= 33) {
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT
+            ) { handleBack() }
+        }
         setContentView(R.layout.activity_main)
         click(R.id.brand) { navigate("home") }
         click(R.id.back) { navigate("home") }
         click(R.id.settings) { navigate("settings") }
         for ((id, destination) in navigation) click(id) { navigate(destination) }
-        navigate(page)
+        navigate(if (intent.hasCategory(Intent.CATEGORY_HOME)) "home" else page)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -109,8 +114,14 @@ class MainActivity : Activity() {
     }
 
     @Deprecated("Legacy device back navigation")
-    override fun onBackPressed() {
-        if (page != "home") navigate("home") else super.onBackPressed()
+    override fun onBackPressed() = handleBack()
+
+    private fun handleBack() {
+        if (page != "home") {
+            navigate("home")
+        } else if (!intent.hasCategory(Intent.CATEGORY_HOME)) {
+            finish()
+        }
     }
 
     private val navigation = listOf(
@@ -221,10 +232,15 @@ class MainActivity : Activity() {
         AlertDialog.Builder(this).setTitle("Rendi disponibile come Home")
             .setMessage("Il launcher comparirà tra le app Home. Potrai scegliere la Home preferita nelle impostazioni Android.")
             .setPositiveButton("Abilita") { _, _ ->
-                packageManager.setComponentEnabledSetting(name, PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                    PackageManager.DONT_KILL_APP)
-                update()
-                openSystem(Settings.ACTION_HOME_SETTINGS)
+                try {
+                    packageManager.setComponentEnabledSetting(name, PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                        PackageManager.DONT_KILL_APP)
+                    update()
+                    openSystem(Settings.ACTION_HOME_SETTINGS)
+                } catch (_: SecurityException) {
+                    Toast.makeText(this, "Le impostazioni del firmware impediscono l’abilitazione della Home.",
+                        Toast.LENGTH_LONG).show()
+                }
             }.setNegativeButton("Annulla", null).show()
     }
 
@@ -232,7 +248,12 @@ class MainActivity : Activity() {
         try {
             startActivity(Intent(action))
         } catch (_: android.content.ActivityNotFoundException) {
-            Toast.makeText(this, "Questa schermata di sistema non è disponibile.", Toast.LENGTH_LONG).show()
+            if (action == Settings.ACTION_HOME_SETTINGS) {
+                openSystem(Settings.ACTION_SETTINGS)
+                Toast.makeText(this, "Cerca la scelta della Home nelle impostazioni del dispositivo.", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "Questa schermata di sistema non è disponibile.", Toast.LENGTH_LONG).show()
+            }
         } catch (_: SecurityException) {
             Toast.makeText(this, "Il firmware impedisce l’apertura delle impostazioni.", Toast.LENGTH_LONG).show()
         }

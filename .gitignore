@@ -7,3 +7,6 @@
 *.iml
 *.jks
 *.keystore
+
+/security/raw/
+/security/zap-home/

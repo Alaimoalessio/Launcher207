@@ -9,13 +9,35 @@ android {
         applicationId 'it.peugeot.launcher'
         minSdk 23
         targetSdk 35
-        versionCode 1
-        versionName '0.1.0-demo'
+        versionCode 2
+        versionName '0.1.1-demo'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
     kotlinOptions { jvmTarget = '1.8' }
-    buildTypes { release { minifyEnabled false } }
+    buildTypes {
+        debug { debuggable false }
+        release { minifyEnabled false }
+    }
+    testOptions {
+        unitTests.includeAndroidResources = true
+        unitTests.all {
+            systemProperty 'robolectric.dependency.repo.url', 'https://repo.maven.apache.org/maven2'
+        }
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.14.1'
+    constraints {
+        testImplementation('org.bouncycastle:bcprov-jdk18on:1.85') {
+            because 'Corregge gli advisory OSV delle versioni transitive di Robolectric'
+        }
+        testImplementation('com.google.guava:guava:33.7.2-jre') {
+            because 'Corregge GHSA-xxph-c9ww-hj94 nella dipendenza dei test'
+        }
+    }
 }

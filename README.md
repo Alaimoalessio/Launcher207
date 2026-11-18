@@ -7,12 +7,13 @@ Interfaccia landscape 1024 × 600, colori grafite e ambra, orologio a quadrante,
 ## Contenuto
 
 - [App Android](android/) in Kotlin con layout XML nativi.
-- [APK di sviluppo](apk/PeugeotLauncher-0.1.0-demo.apk) pronto per le prime prove.
+- [APK di sviluppo](apk/PeugeotLauncher-0.1.1-demo.apk) pronto per le prime prove.
 - [Simulatore web](simulatore/index.html), apribile localmente e utilizzabile offline.
 - [Istruzioni](LEGGIMI.md) per compilazione, modalità demo e collegamenti alle app originali.
 - [Test del simulatore](test/browser-test.html), apribile nel browser.
+- [Revisione del codice](AUDIT.md) e [risultati degli scanner di sicurezza](security/README.md).
 
-## Stato della prima versione
+## Stato della versione 0.1.1-demo
 
 L'app parte in modalità demo con brani, chiamate e proiezione simulati. In modalità dispositivo permette di aprire le app originali scelte nelle impostazioni. Metadati Bluetooth, controlli multimediali e telefonate reali richiedono la verifica delle API del firmware.
 
