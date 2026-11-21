@@ -11,7 +11,9 @@ import android.widget.Toast
 /** Collegamenti scelti dall'utente, senza nomi di pacchetti vendor presunti. */
 class AppLinks(private val activity: Activity, private val preferences: SharedPreferences) {
     fun label(key: String): String {
-        val component = component(key) ?: return "Da scegliere"
+        val component = component(key) ?: return if (key == "auto" &&
+            activity.packageManager.getLaunchIntentForPackage("gb.xxy.hr") != null)
+            "Headunit Reloaded" else "Da scegliere"
         return try {
             activity.packageManager.getActivityInfo(component, 0)
                 .loadLabel(activity.packageManager).toString()
@@ -28,6 +30,18 @@ class AppLinks(private val activity: Activity, private val preferences: SharedPr
     fun open(key: String) {
         val component = component(key)
         if (component == null) {
+            if (key == "auto") {
+                val hur = activity.packageManager.getLaunchIntentForPackage("gb.xxy.hr")
+                if (hur != null) {
+                    try {
+                        activity.startActivity(hur)
+                        return
+                    } catch (_: SecurityException) {
+                        Toast.makeText(activity, "Il firmware impedisce l'apertura di HUR.", Toast.LENGTH_LONG).show()
+                        return
+                    } catch (_: ActivityNotFoundException) { /* App rimossa */ }
+                }
+            }
             Toast.makeText(activity, "Scegli l’app nelle impostazioni del launcher.", Toast.LENGTH_LONG).show()
             return
         }
