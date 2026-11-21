@@ -4,7 +4,7 @@ Il progetto si trova in questa cartella.
 
 - `simulatore/` contiene l'anteprima web già approvata.
 - `android/` contiene la prima app nativa Kotlin + XML.
-- `apk/PeugeotLauncher-0.1.1-demo.apk` è la build di sviluppo installabile.
+- `apk/PeugeotLauncher-0.1.3-demo.apk` è la build di sviluppo installabile.
 - `test/` contiene i controlli dell'anteprima web.
 
 ## Prima app Android

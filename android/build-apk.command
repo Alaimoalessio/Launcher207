@@ -10,8 +10,8 @@ if [[ -z "${JAVA_HOME:-}" ]]; then
 fi
 ./gradlew assembleDebug lintDebug testDebugUnitTest
 mkdir -p ../apk
-cp app/build/outputs/apk/debug/app-debug.apk ../apk/PeugeotLauncher-0.1.1-demo.apk
+cp app/build/outputs/apk/debug/app-debug.apk ../apk/PeugeotLauncher-0.1.3-demo.apk
 (
   cd ../apk
-  shasum -a 256 PeugeotLauncher-0.1.1-demo.apk > PeugeotLauncher-0.1.1-demo.apk.sha256
+  shasum -a 256 PeugeotLauncher-0.1.3-demo.apk > PeugeotLauncher-0.1.3-demo.apk.sha256
 )

@@ -1,8 +1,10 @@
 package it.peugeot.launcher
 
 import android.content.Intent
+import android.content.ComponentCallbacks2
 import android.content.pm.ApplicationInfo
 import android.os.Bundle
+import android.os.Looper
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
@@ -11,7 +13,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.util.concurrent.TimeUnit
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -57,12 +61,43 @@ class LauncherTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java, home).create(saved).start().resume()
         val activity = controller.get()
         try {
-            assertNotNull(activity.findViewById<View>(R.id.clock))
+            val clock = activity.findViewById<View>(R.id.clock)
+            assertNotNull(clock)
+            controller.newIntent(home)
+            assertSame(clock, activity.findViewById<View>(R.id.clock))
             activity.findViewById<View>(R.id.settings).performClick()
             controller.newIntent(home)
-            assertNotNull(activity.findViewById<View>(R.id.clock))
+            assertSame(clock, activity.findViewById<View>(R.id.clock))
+            activity.findViewById<View>(R.id.settings).performClick()
+            activity.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
+            controller.newIntent(home)
+            assertNotSame(clock, activity.findViewById<View>(R.id.clock))
             activity.onBackPressed()
             assertFalse(activity.isFinishing)
+        } finally { controller.pause().stop().destroy() }
+    }
+
+    @Test fun playbackProgressResumesOnlyWhenPlayingAndVisible() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val looper = shadowOf(Looper.getMainLooper())
+        fun elapsed() = activity.findViewById<android.widget.SeekBar>(R.id.seek).progress
+        try {
+            activity.findViewById<View>(R.id.nav_music).performClick()
+            looper.idleFor(2, TimeUnit.SECONDS)
+            assertEquals(0, elapsed())
+            activity.findViewById<View>(R.id.music_play).performClick()
+            looper.idleFor(2250, TimeUnit.MILLISECONDS)
+            assertEquals(2, elapsed())
+            controller.pause()
+            looper.idleFor(2, TimeUnit.SECONDS)
+            assertEquals(2, elapsed())
+            controller.resume()
+            looper.idleFor(1250, TimeUnit.MILLISECONDS)
+            assertEquals(3, elapsed())
+            activity.findViewById<View>(R.id.music_play).performClick()
+            looper.idleFor(2, TimeUnit.SECONDS)
+            assertEquals(3, elapsed())
         } finally { controller.pause().stop().destroy() }
     }
 

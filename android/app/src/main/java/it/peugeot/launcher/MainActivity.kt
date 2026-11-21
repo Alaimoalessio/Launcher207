@@ -3,8 +3,11 @@ package it.peugeot.launcher
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.ActivityManager
+import android.content.BroadcastReceiver
 import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Build
@@ -12,36 +15,49 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.text.TextUtils
+import android.util.SparseArray
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.SeekBar
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import java.util.Locale
 
 class MainActivity : Activity() {
-    private val demo = DemoBackend()
+    private val demoState = lazy(LazyThreadSafetyMode.NONE) { DemoBackend() }
+    private val demo by demoState
     private val unavailable = UnavailableBackend()
     private val preferences by lazy { getSharedPreferences("launcher", MODE_PRIVATE) }
     private val links by lazy { AppLinks(this, preferences) }
     private val handler = Handler(Looper.getMainLooper())
+    private val pageViews = SparseArray<View>(5)
+    private var activeLayout = 0
     private var demoEnabled = true
     private var page = "home"
     private var number = ""
     private var resumed = false
     private val backend: CarBackend get() = if (demoEnabled) demo else unavailable
-    private val tick = object : Runnable {
-        override fun run() {
-            if (!resumed) return
-            val previous = demo.index
-            if (demoEnabled) demo.tick()
+    private val clockEvents = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
             findViewById<ClockView>(R.id.clock)?.refresh()
+        }
+    }
+    private val playbackTick = object : Runnable {
+        override fun run() {
+            val previous = demo.index
+            demo.tick()
             if (previous != demo.index) update()
-            else updateProgress()
+            else if (page == "music") updateProgress()
             handler.postDelayed(this, 1000)
         }
+    }
+
+    private fun schedulePlaybackTick() {
+        handler.removeCallbacks(playbackTick)
+        if (resumed && demoEnabled && demo.playing) handler.postDelayed(playbackTick, 1000)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,8 +66,10 @@ class MainActivity : Activity() {
         savedInstanceState?.let {
             page = it.getString("page", "home")
             number = it.getString("number", "")
-            demo.restore(it.getInt("index"), it.getBoolean("connected", true), it.getBoolean("playing"),
-                it.getInt("elapsed"), it.getString("call", ""), it.getBoolean("projection"))
+            if (it.containsKey("index")) {
+                demo.restore(it.getInt("index"), it.getBoolean("connected", true), it.getBoolean("playing"),
+                    it.getInt("elapsed"), it.getString("call", ""), it.getBoolean("projection"))
+            }
         }
         if (Build.VERSION.SDK_INT >= 33) {
             onBackInvokedDispatcher.registerOnBackInvokedCallback(
@@ -77,15 +95,36 @@ class MainActivity : Activity() {
         resumed = true
         immersive()
         update()
+        val clockFilter = IntentFilter().apply {
+            addAction(Intent.ACTION_TIME_TICK)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+            addAction(Intent.ACTION_DATE_CHANGED)
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(clockEvents, clockFilter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(clockEvents, clockFilter)
+        }
         findViewById<ClockView>(R.id.clock)?.refresh()
-        handler.removeCallbacks(tick)
-        handler.postDelayed(tick, 1000)
+        schedulePlaybackTick()
     }
 
     override fun onPause() {
         resumed = false
-        handler.removeCallbacks(tick)
+        handler.removeCallbacks(playbackTick)
+        unregisterReceiver(clockEvents)
         super.onPause()
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+            val visible = pageViews.get(activeLayout)
+            pageViews.clear()
+            if (visible != null) pageViews.put(activeLayout, visible)
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -104,12 +143,14 @@ class MainActivity : Activity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putString("page", page)
         outState.putString("number", number)
-        outState.putInt("index", demo.index)
-        outState.putBoolean("connected", demo.connected)
-        outState.putBoolean("playing", demo.playing)
-        outState.putInt("elapsed", demo.elapsed)
-        outState.putString("call", demo.callNumber)
-        outState.putBoolean("projection", demo.projection)
+        if (demoState.isInitialized()) {
+            outState.putInt("index", demo.index)
+            outState.putBoolean("connected", demo.connected)
+            outState.putBoolean("playing", demo.playing)
+            outState.putInt("elapsed", demo.elapsed)
+            outState.putString("call", demo.callNumber)
+            outState.putBoolean("projection", demo.projection)
+        }
         super.onSaveInstanceState(outState)
     }
 
@@ -130,6 +171,7 @@ class MainActivity : Activity() {
     )
 
     private fun navigate(destination: String) {
+        val content = findViewById<FrameLayout>(R.id.content)
         page = destination
         val layout = when (page) {
             "music" -> R.layout.screen_music
@@ -138,10 +180,15 @@ class MainActivity : Activity() {
             "settings" -> R.layout.screen_settings
             else -> { page = "home"; R.layout.screen_home }
         }
-        findViewById<FrameLayout>(R.id.content).apply {
-            removeAllViews()
-            layoutInflater.inflate(layout, this, true)
+        if (layout == activeLayout) {
+            if (page == "settings") (content.getChildAt(0) as ScrollView).scrollTo(0, 0)
+            return
         }
+        activeLayout = layout
+        val cached = pageViews.get(layout)
+        val screen = cached ?: layoutInflater.inflate(layout, content, false)
+        content.removeAllViews()
+        content.addView(screen)
         findViewById<View>(R.id.page_header).visibility = if (page == "home") View.GONE else View.VISIBLE
         text(R.id.page_title, when (page) {
             "music" -> "Musica Bluetooth"
@@ -152,20 +199,34 @@ class MainActivity : Activity() {
         })
         navigation.forEach { (id, target) ->
             findViewById<Button>(id).apply {
-                isSelected = target == page
-                setTextColor(if (isSelected) Color.rgb(240, 199, 126) else Color.rgb(244, 239, 228))
+                val selected = target == page
+                if (isSelected != selected) {
+                    isSelected = selected
+                    setTextColor(if (selected) Color.rgb(240, 199, 126) else Color.rgb(244, 239, 228))
+                }
             }
         }
-        if (page == "home" || page == "music") bindPlayer()
-        if (page == "phone") bindPhone()
-        if (page == "settings") bindSettings()
-        if (page == "auto") click(R.id.auto_open) {
-            if (demoEnabled && demo.connected) { demo.toggleProjection(); update() }
-            else if (demoEnabled) navigate("settings")
-            else links.open("auto")
+        if (cached == null) {
+            pageViews.put(layout, screen)
+            bindPage()
+        } else {
+            if (screen is ScrollView) screen.scrollTo(0, 0)
+            if (page == "home") findViewById<ClockView>(R.id.clock).refresh()
         }
         update()
-        findViewById<ClockView>(R.id.clock)?.refresh()
+    }
+
+    private fun bindPage() {
+        when (page) {
+            "home", "music" -> bindPlayer()
+            "phone" -> bindPhone()
+            "settings" -> bindSettings()
+            "auto" -> click(R.id.auto_open) {
+                if (demoEnabled && demo.connected) { demo.toggleProjection(); update() }
+                else if (demoEnabled) navigate("settings")
+                else links.open("auto")
+            }
+        }
     }
 
     private fun bindPlayer() {
@@ -173,7 +234,11 @@ class MainActivity : Activity() {
             listOf(R.id.home_prev, R.id.home_play, R.id.home_next, R.id.home_fallback)
         else listOf(R.id.music_prev, R.id.music_play, R.id.music_next, R.id.music_fallback)
         click(ids[0]) { backend.skip(-1); update() }
-        click(ids[1]) { backend.togglePlayback(); update() }
+        click(ids[1]) {
+            backend.togglePlayback()
+            schedulePlaybackTick()
+            update()
+        }
         click(ids[2]) { backend.skip(1); update() }
         click(ids[3]) { if (demoEnabled) navigate("settings") else links.open("bt") }
         findViewById<SeekBar>(R.id.seek)?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -211,9 +276,14 @@ class MainActivity : Activity() {
             preferences.edit().putBoolean("demo", demoEnabled).apply()
             demo.connectDemo(demoEnabled)
             number = ""
+            schedulePlaybackTick()
             update()
         }
-        click(R.id.connect) { demo.connectDemo(!demo.connected); update() }
+        click(R.id.connect) {
+            demo.connectDemo(!demo.connected)
+            schedulePlaybackTick()
+            update()
+        }
         for ((id, key) in listOf(R.id.choose_bt to "bt", R.id.choose_phone to "phone", R.id.choose_auto to "auto")) {
             click(id) { links.choose(key) { update() } }
         }
@@ -294,14 +364,17 @@ class MainActivity : Activity() {
                     else listOf(R.id.music_prev, R.id.music_play, R.id.music_next)
                 controls.forEach { findViewById<View>(it).isEnabled = current.connected }
                 findViewById<ImageButton>(controls[1]).apply {
-                    setImageResource(if (current.playing) R.drawable.ic_pause else R.drawable.ic_play)
-                    contentDescription = if (current.playing) "Pausa" else "Riproduci"
+                    val description = if (current.playing) "Pausa" else "Riproduci"
+                    if (!TextUtils.equals(contentDescription, description)) {
+                        setImageResource(if (current.playing) R.drawable.ic_pause else R.drawable.ic_play)
+                        contentDescription = description
+                    }
                 }
                 val fallback = if (page == "home") R.id.home_fallback else R.id.music_fallback
                 findViewById<Button>(fallback).apply {
                     visibility = if (current.connected) View.GONE else View.VISIBLE
-                    text = if (demoEnabled) "Apri impostazioni" else "Apri app Bluetooth"
                 }
+                text(fallback, if (demoEnabled) "Apri impostazioni" else "Apri app Bluetooth")
                 findViewById<SeekBar>(R.id.seek)?.apply {
                     isEnabled = current.connected
                     max = current.track?.duration ?: 1
@@ -319,11 +392,13 @@ class MainActivity : Activity() {
                 findViewById<View>(R.id.erase).isEnabled = available && number.isNotEmpty()
                 findViewById<Button>(R.id.call).apply {
                     isEnabled = current.connected && (number.isNotEmpty() || call.isNotEmpty())
-                    text = if (call.isEmpty()) "Simula chiamata" else "Termina chiamata"
-                    backgroundTintList = android.content.res.ColorStateList.valueOf(
-                        if (call.isEmpty()) Color.rgb(240, 199, 126) else Color.rgb(166, 74, 58))
-                    setTextColor(if (call.isEmpty()) Color.rgb(42, 29, 11) else Color.WHITE)
+                    val fill = if (call.isEmpty()) Color.rgb(240, 199, 126) else Color.rgb(166, 74, 58)
+                    if (backgroundTintList?.defaultColor != fill) {
+                        backgroundTintList = android.content.res.ColorStateList.valueOf(fill)
+                        setTextColor(if (call.isEmpty()) Color.rgb(42, 29, 11) else Color.WHITE)
+                    }
                 }
+                text(R.id.call, if (call.isEmpty()) "Simula chiamata" else "Termina chiamata")
                 findViewById<View>(R.id.phone_fallback).visibility = if (demoEnabled) View.GONE else View.VISIBLE
             }
             "auto" -> {
@@ -338,7 +413,7 @@ class MainActivity : Activity() {
             "settings" -> {
                 text(R.id.demo, if (demoEnabled) "Disattiva demo" else "Attiva demo")
                 findViewById<View>(R.id.connect).isEnabled = demoEnabled
-                text(R.id.connect, if (demo.connected) "Disconnetti telefono demo" else "Connetti telefono demo")
+                text(R.id.connect, if (demoEnabled && demo.connected) "Disconnetti telefono demo" else "Connetti telefono demo")
                 text(R.id.choose_bt, "App musica Bluetooth • ${links.label("bt")}")
                 text(R.id.choose_phone, "App telefono • ${links.label("phone")}")
                 text(R.id.choose_auto, "App Android Auto • ${links.label("auto")}")
@@ -355,7 +430,14 @@ class MainActivity : Activity() {
         text(R.id.track_time, "${formatTime(backend.elapsed)} / ${formatTime(backend.track?.duration ?: 0)}")
     }
 
-    private fun formatTime(seconds: Int) = String.format(Locale.ITALIAN, "%d:%02d", seconds / 60, seconds % 60)
-    private fun text(id: Int, value: String) { findViewById<TextView>(id)?.text = value }
+    private fun formatTime(seconds: Int): String {
+        val remainder = seconds % 60
+        return "${seconds / 60}:${if (remainder < 10) "0" else ""}$remainder"
+    }
+
+    private fun text(id: Int, value: String) {
+        val view = findViewById<TextView>(id) ?: return
+        if (!TextUtils.equals(view.text, value)) view.text = value
+    }
     private fun click(id: Int, action: () -> Unit) { findViewById<View>(id)?.setOnClickListener { action() } }
 }
