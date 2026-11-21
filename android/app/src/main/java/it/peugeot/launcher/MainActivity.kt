@@ -11,6 +11,9 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.net.Uri
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -23,22 +26,23 @@ import java.util.Locale
 
 class MainActivity : Activity() {
     private val demo = DemoBackend()
-    private val unavailable = UnavailableBackend()
+    private val live by lazy { RealMediaBackend(this) }
     private val preferences by lazy { getSharedPreferences("launcher", MODE_PRIVATE) }
     private val links by lazy { AppLinks(this, preferences) }
     private val handler = Handler(Looper.getMainLooper())
-    private var demoEnabled = true
+    private var demoEnabled = false
+    private var polls = 0
     private var page = "home"
     private var number = ""
     private var resumed = false
-    private val backend: CarBackend get() = if (demoEnabled) demo else unavailable
+    private val backend: CarBackend get() = if (demoEnabled) demo else live
     private val tick = object : Runnable {
         override fun run() {
             if (!resumed) return
             val previous = demo.index
-            if (demoEnabled) demo.tick()
+            if (demoEnabled) demo.tick() else if (++polls % 3 == 0) live.refresh()
             findViewById<ClockView>(R.id.clock)?.refresh()
-            if (previous != demo.index) update()
+            if (!demoEnabled || previous != demo.index) update()
             else updateProgress()
             handler.postDelayed(this, 1000)
         }
@@ -46,7 +50,11 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        demoEnabled = preferences.getBoolean("demo", true)
+        // Il passaggio dalla demo 0.1.x alla modalità reale è intenzionale.
+        if (!preferences.getBoolean("live_migrated", false)) {
+            preferences.edit().putBoolean("demo", false).putBoolean("live_migrated", true).apply()
+        }
+        demoEnabled = preferences.getBoolean("demo", false)
         savedInstanceState?.let {
             page = it.getString("page", "home")
             number = it.getString("number", "")
@@ -76,6 +84,7 @@ class MainActivity : Activity() {
         super.onResume()
         resumed = true
         immersive()
+        if (!demoEnabled) live.refresh()
         update()
         findViewById<ClockView>(R.id.clock)?.refresh()
         handler.removeCallbacks(tick)
@@ -156,7 +165,10 @@ class MainActivity : Activity() {
                 setTextColor(if (isSelected) Color.rgb(240, 199, 126) else Color.rgb(244, 239, 228))
             }
         }
-        if (page == "home" || page == "music") bindPlayer()
+        if (page == "home" || page == "music") {
+            if (!demoEnabled) live.refresh()
+            bindPlayer()
+        }
         if (page == "phone") bindPhone()
         if (page == "settings") bindSettings()
         if (page == "auto") click(R.id.auto_open) {
@@ -178,7 +190,7 @@ class MainActivity : Activity() {
         click(ids[3]) { if (demoEnabled) navigate("settings") else links.open("bt") }
         findViewById<SeekBar>(R.id.seek)?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
-                if (fromUser) { backend.seek(progress); updateProgress() }
+                if (fromUser && (demoEnabled || live.canSeek)) { backend.seek(progress); updateProgress() }
             }
             override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
             override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
@@ -194,15 +206,37 @@ class MainActivity : Activity() {
 
     private fun bindPhone() {
         digits.forEach { (id, digit) -> click(id) {
-            if (number.length < 20 && backend.connected && backend.callNumber.isEmpty()) number += digit
+            if (number.length < 20 && (!demoEnabled ||
+                    (backend.connected && backend.callNumber.isEmpty()))) number += digit
             update()
         } }
         click(R.id.erase) { number = number.dropLast(1); update() }
         click(R.id.call) {
-            if (backend.callNumber.isEmpty()) backend.dial(number) else backend.hangUp()
+            if (demoEnabled) {
+                if (backend.callNumber.isEmpty()) backend.dial(number) else backend.hangUp()
+            } else openRealDialer()
             update()
         }
         click(R.id.phone_fallback) { links.open("phone") }
+    }
+
+    /**
+     * Apre il dialer reale, senza permesso CALL_PHONE. La ROM BT XY AUTO potrebbe
+     * non esporre un dialer compatibile con ACTION_DIAL: rimane il fallback OEM.
+     */
+    private fun openRealDialer() {
+        if (number.isBlank()) return
+        try {
+            startActivity(Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)))
+        } catch (_: android.content.ActivityNotFoundException) {
+            val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("Numero telefonico", number))
+            Toast.makeText(this, "Nessun dialer Android: numero copiato. Apri il telefono Bluetooth originale.", Toast.LENGTH_LONG).show()
+            links.open("phone")
+        } catch (_: SecurityException) {
+            Toast.makeText(this, "Il firmware blocca il dialer: apri il telefono Bluetooth originale.", Toast.LENGTH_LONG).show()
+            links.open("phone")
+        }
     }
 
     private fun bindSettings() {
@@ -214,6 +248,7 @@ class MainActivity : Activity() {
             update()
         }
         click(R.id.connect) { demo.connectDemo(!demo.connected); update() }
+        click(R.id.media_access) { openSystem(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
         for ((id, key) in listOf(R.id.choose_bt to "bt", R.id.choose_phone to "phone", R.id.choose_auto to "auto")) {
             click(id) { links.choose(key) { update() } }
         }
@@ -280,18 +315,26 @@ class MainActivity : Activity() {
 
     private fun update() {
         val current = backend
-        text(R.id.status, if (!demoEnabled) "Bluetooth • stato non verificato"
-            else if (current.connected) "Telefono demo connesso" else "Telefono demo scollegato")
-        text(R.id.mode, "1024 × 600 • " + if (demoEnabled) "Demo attiva • audio e chiamate simulati" else "Modalità dispositivo")
+        text(R.id.status, if (demoEnabled) {
+            if (demo.connected) "Telefono demo collegato" else "Demo scollegata"
+        } else if (!live.accessGranted) "Accesso musica da abilitare"
+        else if (live.connected) "Player: ${live.source}"
+        else "Nessun player rilevato")
+        text(R.id.mode, if (demoEnabled) "1024 × 600 • DEMO: nessuna azione reale"
+            else "1024 × 600 • Dispositivo reale • Moduli OEM preservati")
         when (page) {
             "home", "music" -> {
-                val title = if (demoEnabled) current.track?.title ?: "Sorgente scollegata" else "Musica Bluetooth"
-                val artist = if (demoEnabled) current.track?.artist ?: "Connetti il telefono demo nelle impostazioni."
-                    else "Controlli e metadati da verificare sulla radio."
+                val title = if (demoEnabled) current.track?.title ?: "Sorgente scollegata"
+                    else current.track?.title ?: "Nessun brano disponibile"
+                val artist = if (demoEnabled) current.track?.artist ?: "Attiva la demo nelle impostazioni"
+                    else current.track?.artist ?: if (!live.accessGranted)
+                        "Abilita accesso media nelle impostazioni"
+                    else "Apri un player o il Bluetooth originale"
                 text(if (page == "home") R.id.home_title else R.id.music_title, title)
                 text(if (page == "home") R.id.home_artist else R.id.music_artist, artist)
-                val controls = if (page == "home") listOf(R.id.home_prev, R.id.home_play, R.id.home_next)
-                    else listOf(R.id.music_prev, R.id.music_play, R.id.music_next)
+                val controls = if (page == "home")
+                    listOf(R.id.home_prev, R.id.home_play, R.id.home_next)
+                else listOf(R.id.music_prev, R.id.music_play, R.id.music_next)
                 controls.forEach { findViewById<View>(it).isEnabled = current.connected }
                 findViewById<ImageButton>(controls[1]).apply {
                     setImageResource(if (current.playing) R.drawable.ic_pause else R.drawable.ic_play)
@@ -299,36 +342,42 @@ class MainActivity : Activity() {
                 }
                 val fallback = if (page == "home") R.id.home_fallback else R.id.music_fallback
                 findViewById<Button>(fallback).apply {
-                    visibility = if (current.connected) View.GONE else View.VISIBLE
-                    text = if (demoEnabled) "Apri impostazioni" else "Apri app Bluetooth"
+                    visibility = if (!demoEnabled || !current.connected) View.VISIBLE else View.GONE
+                    text = if (demoEnabled) "Apri impostazioni" else "Apri Bluetooth originale"
                 }
                 findViewById<SeekBar>(R.id.seek)?.apply {
-                    isEnabled = current.connected
-                    max = current.track?.duration ?: 1
+                    max = (current.track?.duration ?: 0).coerceAtLeast(1)
+                    isEnabled = if (demoEnabled) current.connected else live.canSeek
                 }
                 updateProgress()
             }
             "phone" -> {
-                val call = current.callNumber
-                text(R.id.call_status, if (!demoEnabled) "Usa l’app telefono originale"
-                    else if (call.isNotEmpty()) "Chiamata simulata in corso"
-                    else if (current.connected) "Tastierino demo" else "Telefono demo scollegato")
+                val call = if (demoEnabled) current.callNumber else ""
+                text(R.id.call_status, if (demoEnabled) {
+                    if (call.isNotEmpty()) "Chiamata demo in corso"
+                    else if (current.connected) "Tastierino demo" else "Telefono demo scollegato"
+                } else "Apre il dialer disponibile sul dispositivo")
                 text(R.id.number, call.ifEmpty { number.ifEmpty { "—" } })
-                val available = current.connected && call.isEmpty()
+                val available = !demoEnabled || (current.connected && call.isEmpty())
                 digits.forEach { (id, _) -> findViewById<View>(id).isEnabled = available && number.length < 20 }
                 findViewById<View>(R.id.erase).isEnabled = available && number.isNotEmpty()
                 findViewById<Button>(R.id.call).apply {
-                    isEnabled = current.connected && (number.isNotEmpty() || call.isNotEmpty())
-                    text = if (call.isEmpty()) "Simula chiamata" else "Termina chiamata"
+                    isEnabled = if (demoEnabled) current.connected && (number.isNotEmpty() || call.isNotEmpty())
+                        else number.isNotEmpty()
+                    text = if (!demoEnabled) "Apri dialer"
+                        else if (call.isEmpty()) "Simula chiamata" else "Termina chiamata"
                     backgroundTintList = android.content.res.ColorStateList.valueOf(
                         if (call.isEmpty()) Color.rgb(240, 199, 126) else Color.rgb(166, 74, 58))
                     setTextColor(if (call.isEmpty()) Color.rgb(42, 29, 11) else Color.WHITE)
                 }
-                findViewById<View>(R.id.phone_fallback).visibility = if (demoEnabled) View.GONE else View.VISIBLE
+                findViewById<View>(R.id.phone_fallback).visibility =
+                    if (demoEnabled) View.GONE else View.VISIBLE
             }
             "auto" -> {
-                text(R.id.auto_title, if (demoEnabled && demo.projection) "Sessione demo attiva" else "Proiezione Android Auto")
-                text(R.id.auto_status, if (!demoEnabled) "Apri l’app di proiezione scelta nelle impostazioni."
+                text(R.id.auto_title, if (demoEnabled && demo.projection) "Sessione demo attiva"
+                    else "Proiezione Android Auto")
+                text(R.id.auto_status, if (!demoEnabled)
+                    "Apri ${links.label("auto")}. La connessione USB/Wi-Fi resta gestita da HUR."
                     else if (demo.connected) "Anteprima dello stato di proiezione."
                     else "Connetti il telefono demo nelle impostazioni.")
                 text(R.id.auto_open, if (!demoEnabled) "Apri Android Auto"
@@ -337,8 +386,12 @@ class MainActivity : Activity() {
             }
             "settings" -> {
                 text(R.id.demo, if (demoEnabled) "Disattiva demo" else "Attiva demo")
+                findViewById<View>(R.id.connect).visibility = if (demoEnabled) View.VISIBLE else View.GONE
                 findViewById<View>(R.id.connect).isEnabled = demoEnabled
                 text(R.id.connect, if (demo.connected) "Disconnetti telefono demo" else "Connetti telefono demo")
+                text(R.id.media_state, if (live.accessGranted)
+                    "Accesso multimediale attivo. Sessione: ${live.source}"
+                    else "Accesso media disattivato: serve per controllare le sessioni Android.")
                 text(R.id.choose_bt, "App musica Bluetooth • ${links.label("bt")}")
                 text(R.id.choose_phone, "App telefono • ${links.label("phone")}")
                 text(R.id.choose_auto, "App Android Auto • ${links.label("auto")}")
@@ -352,7 +405,9 @@ class MainActivity : Activity() {
     private fun updateProgress() {
         if (page != "music") return
         findViewById<SeekBar>(R.id.seek)?.progress = backend.elapsed
-        text(R.id.track_time, "${formatTime(backend.elapsed)} / ${formatTime(backend.track?.duration ?: 0)}")
+        text(R.id.track_time, if ((backend.track?.duration ?: 0) > 0)
+            "${formatTime(backend.elapsed)} / ${formatTime(backend.track?.duration ?: 0)}"
+            else "Durata non disponibile")
     }
 
     private fun formatTime(seconds: Int) = String.format(Locale.ITALIAN, "%d:%02d", seconds / 60, seconds % 60)

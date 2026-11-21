@@ -21,6 +21,8 @@ class LauncherTest {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
         try {
+            activity.findViewById<View>(R.id.settings).performClick()
+            activity.findViewById<View>(R.id.demo).performClick()
             activity.findViewById<View>(R.id.nav_music).performClick()
             activity.findViewById<View>(R.id.music_next).performClick()
             assertEquals("Luci di città", activity.findViewById<TextView>(R.id.music_title).text.toString())
@@ -69,6 +71,8 @@ class LauncherTest {
     @Test fun stateSurvivesRecreationAndDeviceModeDisablesMockCommands() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         try {
+            controller.get().findViewById<View>(R.id.settings).performClick()
+            controller.get().findViewById<View>(R.id.demo).performClick()
             controller.get().findViewById<View>(R.id.nav_phone).performClick()
             controller.get().findViewById<View>(R.id.digit_1).performClick()
             controller.recreate()
@@ -77,7 +81,8 @@ class LauncherTest {
             activity.findViewById<View>(R.id.settings).performClick()
             activity.findViewById<View>(R.id.demo).performClick()
             activity.findViewById<View>(R.id.nav_phone).performClick()
-            assertFalse(activity.findViewById<Button>(R.id.call).isEnabled)
+            assertTrue(activity.findViewById<Button>(R.id.call).isEnabled)
+            assertEquals("Apri dialer", activity.findViewById<Button>(R.id.call).text.toString())
             assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.phone_fallback).visibility)
             assertEquals(0, activity.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE)
         } finally { controller.pause().stop().destroy() }

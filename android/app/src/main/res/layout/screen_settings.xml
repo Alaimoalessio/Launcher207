@@ -5,6 +5,8 @@
             <Button android:id="@+id/connect" style="@style/Button" android:text="@string/connect" android:layout_width="0dp" android:layout_weight="1" />
         </LinearLayout>
         <TextView android:id="@+id/settings_hint" style="@style/Muted" android:text="@string/settings_hint" android:layout_marginTop="10dp" android:layout_marginBottom="10dp" />
+        <Button android:id="@+id/media_access" style="@style/Button" android:text="Autorizza controlli multimediali" android:layout_width="match_parent" />
+        <TextView android:id="@+id/media_state" style="@style/Muted" android:text="Accesso media non verificato" android:layout_marginBottom="8dp" />
         <Button android:id="@+id/choose_bt" style="@style/Button" android:text="@string/choose_bt" android:layout_width="match_parent" />
         <Button android:id="@+id/choose_phone" style="@style/Button" android:text="@string/choose_phone" android:layout_width="match_parent" />
         <Button android:id="@+id/choose_auto" style="@style/Button" android:text="@string/choose_auto" android:layout_width="match_parent" />
