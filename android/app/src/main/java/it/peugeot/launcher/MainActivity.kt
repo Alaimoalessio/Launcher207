@@ -31,7 +31,6 @@ class MainActivity : Activity() {
     private val links by lazy { AppLinks(this, preferences) }
     private val handler = Handler(Looper.getMainLooper())
     private var demoEnabled = false
-    private var polls = 0
     private var page = "home"
     private var number = ""
     private var resumed = false
@@ -40,7 +39,7 @@ class MainActivity : Activity() {
         override fun run() {
             if (!resumed) return
             val previous = demo.index
-            if (demoEnabled) demo.tick() else if (++polls % 3 == 0) live.refresh()
+            if (demoEnabled) demo.tick()
             findViewById<ClockView>(R.id.clock)?.refresh()
             if (!demoEnabled || previous != demo.index) update()
             else updateProgress()
@@ -248,7 +247,6 @@ class MainActivity : Activity() {
             update()
         }
         click(R.id.connect) { demo.connectDemo(!demo.connected); update() }
-        click(R.id.media_access) { openSystem(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS) }
         for ((id, key) in listOf(R.id.choose_bt to "bt", R.id.choose_phone to "phone", R.id.choose_auto to "auto")) {
             click(id) { links.choose(key) { update() } }
         }
@@ -317,9 +315,7 @@ class MainActivity : Activity() {
         val current = backend
         text(R.id.status, if (demoEnabled) {
             if (demo.connected) "Telefono demo collegato" else "Demo scollegata"
-        } else if (!live.accessGranted) "Accesso musica da abilitare"
-        else if (live.connected) "Player: ${live.source}"
-        else "Nessun player rilevato")
+        } else "Tasti media Android • Bluetooth OEM disponibile")
         text(R.id.mode, if (demoEnabled) "1024 × 600 • DEMO: nessuna azione reale"
             else "1024 × 600 • Dispositivo reale • Moduli OEM preservati")
         when (page) {
@@ -327,9 +323,7 @@ class MainActivity : Activity() {
                 val title = if (demoEnabled) current.track?.title ?: "Sorgente scollegata"
                     else current.track?.title ?: "Nessun brano disponibile"
                 val artist = if (demoEnabled) current.track?.artist ?: "Attiva la demo nelle impostazioni"
-                    else current.track?.artist ?: if (!live.accessGranted)
-                        "Abilita accesso media nelle impostazioni"
-                    else "Apri un player o il Bluetooth originale"
+                    else "Metadati non accessibili • apri Bluetooth originale"
                 text(if (page == "home") R.id.home_title else R.id.music_title, title)
                 text(if (page == "home") R.id.home_artist else R.id.music_artist, artist)
                 val controls = if (page == "home")
@@ -389,9 +383,6 @@ class MainActivity : Activity() {
                 findViewById<View>(R.id.connect).visibility = if (demoEnabled) View.VISIBLE else View.GONE
                 findViewById<View>(R.id.connect).isEnabled = demoEnabled
                 text(R.id.connect, if (demo.connected) "Disconnetti telefono demo" else "Connetti telefono demo")
-                text(R.id.media_state, if (live.accessGranted)
-                    "Accesso multimediale attivo. Sessione: ${live.source}"
-                    else "Accesso media disattivato: serve per controllare le sessioni Android.")
                 text(R.id.choose_bt, "App musica Bluetooth • ${links.label("bt")}")
                 text(R.id.choose_phone, "App telefono • ${links.label("phone")}")
                 text(R.id.choose_auto, "App Android Auto • ${links.label("auto")}")

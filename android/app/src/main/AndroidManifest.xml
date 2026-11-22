@@ -16,14 +16,6 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        <service android:name=".MediaAccessService"
-            android:label="Peugeot Launcher - controllo musica"
-            android:exported="true"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService"/>
-            </intent-filter>
-        </service>
         <activity-alias android:name=".HomeEntry" android:targetActivity=".MainActivity"
             android:enabled="false" android:exported="true" android:label="Peugeot Launcher">
             <intent-filter>

@@ -1,4 +1,4 @@
-name: Android APK (live preview)
+name: Android APK (safe preview)
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -25,10 +25,29 @@ jobs:
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
-      - run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug
+      - name: Verify notification listener is absent
+        run: |
+          ! grep -q BIND_NOTIFICATION_LISTENER_SERVICE android/app/src/main/AndroidManifest.xml
+          ! grep -q NotificationListenerService android/app/src/main/AndroidManifest.xml
+          ! grep -R -q MediaAccessService android/app/src/main
+      - name: Build and test
+        run: chmod +x gradlew && ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug
         working-directory: android
       - uses: actions/upload-artifact@v4
         with:
-          name: PeugeotLauncher-0.2.0-live-preview-debug
+          name: PeugeotLauncher-0.2.1-safe-debug
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+      - name: Publish direct APK
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk PeugeotLauncher-0.2.1-safe.apk
+          sha256sum PeugeotLauncher-0.2.1-safe.apk > PeugeotLauncher-0.2.1-safe.apk.sha256
+          gh release create v0.2.1-safe PeugeotLauncher-0.2.1-safe.apk PeugeotLauncher-0.2.1-safe.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Peugeot Launcher 0.2.1 - senza notifiche" \
+            --notes "Release di test priva di NotificationListenerService. Mantiene tasti media Android standard e collegamenti alle app OEM. Non disabilitare Play Protect. Non impostare ancora come Home predefinita." \
+            --prerelease

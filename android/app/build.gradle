@@ -9,8 +9,8 @@ android {
         applicationId 'it.peugeot.launcher'
         minSdk 23
         targetSdk 35
-        versionCode 3
-        versionName '0.2.0-live-preview'
+        versionCode 4
+        versionName '0.2.1-safe-preview'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8

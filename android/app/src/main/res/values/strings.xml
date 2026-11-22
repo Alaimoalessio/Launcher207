@@ -1,13 +1,13 @@
 <resources>
     <string name="home_source">Musica Bluetooth</string>
     <string name="home_title">Nessun brano disponibile</string>
-    <string name="home_artist">Abilita l\'accesso media nelle impostazioni</string>
+    <string name="home_artist">Apri Bluetooth originale per i dettagli del brano</string>
     <string name="home_prev">Brano precedente</string>
     <string name="home_play">Riproduci</string>
     <string name="home_next">Brano successivo</string>
     <string name="home_fallback">Apri app Bluetooth</string>
     <string name="music_title">Nessun brano disponibile</string>
-    <string name="music_artist">Abilita l\'accesso media nelle impostazioni</string>
+    <string name="music_artist">Apri Bluetooth originale per i dettagli del brano</string>
     <string name="seek">Posizione nel brano</string>
     <string name="track_time">0:00 / 3:48</string>
     <string name="music_prev">Brano precedente</string>
@@ -36,7 +36,7 @@
     <string name="auto_open">Apri Android Auto</string>
     <string name="demo">Disattiva demo</string>
     <string name="connect">Disconnetti telefono demo</string>
-    <string name="settings_hint">Le sessioni musicali Android richiedono accesso alle notifiche. Sul Bluetooth XY AUTO non è garantito: imposta anche l\'app originale.</string>
+    <string name="settings_hint">Nessun accesso a notifiche o messaggi. I tasti media standard potrebbero non funzionare col Bluetooth proprietario: configura anche le app originali.</string>
     <string name="choose_bt">App musica Bluetooth</string>
     <string name="choose_phone">App telefono</string>
     <string name="choose_auto">App Android Auto</string>
