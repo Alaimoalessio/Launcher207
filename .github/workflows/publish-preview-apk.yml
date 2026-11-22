@@ -1,0 +1,39 @@
+name: Publish Peugeot Launcher preview APK
+
+on:
+  push:
+    branches: [feature/live-device-integration]
+    paths:
+      - .github/workflows/publish-preview-apk.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified Android APK artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/launcher"
+          gh run download 44910186900 --repo "$GITHUB_REPOSITORY" \
+            --name PeugeotLauncher-0.2.0-live-preview-debug \
+            --dir "$RUNNER_TEMP/launcher"
+          test -s "$RUNNER_TEMP/launcher/app-debug.apk"
+          echo "765632301dccaa5b98aa2cf5062caf5674c58382e4339300c10f7fb6d7ffb193  $RUNNER_TEMP/launcher/app-debug.apk" | sha256sum -c -
+          mv "$RUNNER_TEMP/launcher/app-debug.apk" "$RUNNER_TEMP/launcher/PeugeotLauncher-0.2.0.apk"
+      - name: Publish direct download on GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create v0.2.0-preview \
+            "$RUNNER_TEMP/launcher/PeugeotLauncher-0.2.0.apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "Peugeot Launcher 0.2.0 — anteprima funzioni reali" \
+            --notes "Anteprima per test su autoradio XY AUTO: MediaSession Android, apertura Headunit Reloaded, dialer Android, collegamenti OEM. Il Bluetooth proprietario non e ancora integrato. Non impostare come Home predefinita. Firma debug diversa dalla demo precedente." \
+            --prerelease
